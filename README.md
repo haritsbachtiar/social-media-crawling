@@ -13,10 +13,11 @@ This project uses Python **virtual environment (venv)** to keep dependencies con
     `python -m venv venv`
 
 3. **Activate venv**
+    
     Windows
     
     `venv\Scripts\activate`
-    
+
     MacOS / Linus
     
     `source venv/bin/activate`
