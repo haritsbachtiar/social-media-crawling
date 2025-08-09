@@ -29,6 +29,8 @@ def fetch_recent_tweets(query: str):
         bearer_token = os.getenv("BEARER_TOKEN")
         print(f"Attempting to load BEARER_TOKEN...")
         print(f"Value found: '{bearer_token}'")
+        print("ENV KEYS:", list(os.environ.keys()))
+        print("BEARER_TOKEN from env:", os.getenv("BEARER_TOKEN"))
         if not bearer_token:
             print("BEARER_TOKEN not found or is empty. Failing authentication.")
             return {"error": "Authentication Failed"}
