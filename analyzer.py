@@ -32,7 +32,7 @@ def fetch_recent_tweets(query: str):
             "max_results": max_results,
             "tweet.fields": "created_at,public_metrics,author_id,geo",
             "expansions": "author_id,geo.place_id",
-            "user.fields": "username,public_metrics,verified",
+            "user.fields": "username,public_metrics,verified,location",
             "place.fields": "full_name,country,place_type,geo,contained_within"
         }
         # Make request with timeout
@@ -248,6 +248,7 @@ def analyze(query: str):
     tweets = data.get("data", [])
     includes = data.get("includes", {})
     users = {u["id"]: u for u in includes.get("users", [])}
+    places = {p["id"]: p for p in includes.get("places", [])}
 
     total_mentions = len(tweets)
 
@@ -323,6 +324,12 @@ def analyze(query: str):
                     engagements.append(eng)
                     
                 reach_set.add(author_id)
+
+                # Profile location as fallback (since geo data is rare)
+                if location and location.strip():
+                    city_name = extract_city_name(location)
+                    if city_name:
+                        city_counter[city_name] += 1
             
             # Indonesian city extraction from GEO DATA ONLY
             geo_data = t.get("geo")
@@ -364,20 +371,19 @@ def analyze(query: str):
                 )
                 recent_tweets_list.append(tweet_obj)
 
-            # # Keywords (simple split)
-            words = [word.lower().strip(".,!?:;\"'()[]{}") 
-                    for word in text.split() 
-                    if len(word) > 3 and not word.startswith(('http', '@', '#'))]
-            keywords.update(words)
-
-            # Keywords extraction (improved)
+            # Keywords extraction 
             words = []
             for word in text.split():
+                # Remove punctuation but keep the word
                 clean_word = word.lower().strip(".,!?:;\"'()[]{}").strip()
-                if (len(clean_word) > 3 and 
-                    not clean_word.startswith(('http', '@', '#')) and 
-                    clean_word.isalpha()):
+                
+                # Less strict filtering - include more words
+                if (len(clean_word) > 2 and  # Reduced from 3 to 2
+                    not clean_word.startswith(('http', '@')) and  # Allow hashtags
+                    not clean_word.isdigit() and  # Exclude pure numbers
+                    clean_word.isalpha()):  # Only alphabetic characters
                     words.append(clean_word)
+            
             keywords_counter.update(words)
 
         except Exception as e:
