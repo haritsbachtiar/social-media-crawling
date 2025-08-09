@@ -225,6 +225,16 @@ def extract_city_name(location_string: str) -> Optional[str]:
     
     return None
 
+
+def get_sentiment_label(polarity: float) -> str:
+        """Convert sentiment polarity to label"""
+        if polarity > 0.1:
+            return "positive"
+        elif polarity < -0.1:
+            return "negative"
+        else:
+            return "neutral"
+
 def analyze(query: str):
     data = fetch_recent_tweets(query=query)
 
@@ -278,15 +288,15 @@ def analyze(query: str):
             text = t.get("text", "")
             author_id = t.get("author_id")
 
-            # Sentiment (More Acurate But Takes Time)
-            sentiment_result = indobert_sentiment.get_detailed_sentiment(text)
-            polarity = sentiment_result['polarity']
-            sentiment_label = sentiment_result['label']
+            # Sentiment (More Acurate But Takes Time) Will Change To This When Available
+            # sentiment_result = indobert_sentiment.get_detailed_sentiment(text)
+            # polarity = sentiment_result['polarity']
+            # sentiment_label = sentiment_result['label']
 
             # Sentiment (Simpler Version)
-            # sentiment_blob = TextBlob(text)
-            # polarity = sentiment_blob.sentiment.polarity
-            # sentiment_label = indobert_sentiment.get_sentiment_label(polarity)
+            sentiment_blob = TextBlob(text)
+            polarity = sentiment_blob.sentiment.polarity
+            sentiment_label = get_sentiment_label(polarity)
 
             # Date parsing for trends
             positive_count += polarity > 0
@@ -425,7 +435,7 @@ def analyze(query: str):
                 user_obj = User(
                     username=username,
                     followers=data["followers"],
-                    sentiment=indobert_sentiment.get_sentiment_label(avg_sentiment),
+                    sentiment=get_sentiment_label(avg_sentiment),
                     sentiment_score=round(avg_sentiment, 3),
                     total_tweets=data["tweet_count"]
                 )
