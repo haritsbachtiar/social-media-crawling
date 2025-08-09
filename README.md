@@ -26,6 +26,10 @@ This project uses Python **virtual environment (venv)** to keep dependencies con
     
     `pip install -r requirements.txt`
 
-5. **Run the project**
+5. **Download the NLTK corpora**
+
+    `python -m textblob.download_corpora`
+
+6. **Run the project**
     
     `uvicorn main:app --reload`
