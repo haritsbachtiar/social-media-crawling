@@ -8,9 +8,9 @@ from textblob import TextBlob
 from dotenv import load_dotenv
 from responses import *
 from typing import Optional
-from indo_bert_sentiment import IndoBERTSentiment
+# from indo_bert_sentiment import IndoBERTSentiment
 
-indobert_sentiment = IndoBERTSentiment()
+# indobert_sentiment = IndoBERTSentiment()
 
 def fetch_recent_tweets(query: str):
     try:
@@ -289,14 +289,14 @@ def analyze(query: str):
             author_id = t.get("author_id")
 
             # Sentiment (More Acurate But Takes Time) Will Change To This When Available
-            sentiment_result = indobert_sentiment.get_detailed_sentiment(text)
-            polarity = sentiment_result['polarity']
-            sentiment_label = sentiment_result['label']
+            # sentiment_result = indobert_sentiment.get_detailed_sentiment(text)
+            # polarity = sentiment_result['polarity']
+            # sentiment_label = sentiment_result['label']
 
             # Sentiment (Simpler Version)
-            # sentiment_blob = TextBlob(text)
-            # polarity = sentiment_blob.sentiment.polarity
-            # sentiment_label = get_sentiment_label(polarity)
+            sentiment_blob = TextBlob(text)
+            polarity = sentiment_blob.sentiment.polarity
+            sentiment_label = get_sentiment_label(polarity)
 
             # Date parsing for trends
             positive_count += polarity > 0
