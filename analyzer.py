@@ -10,6 +10,8 @@ from responses import *
 from typing import Optional
 from indo_bert_sentiment import IndoBERTSentiment
 
+indobert_sentiment = IndoBERTSentiment()
+
 def fetch_recent_tweets(query: str):
     try:
         # Encode query to be URL-safe
@@ -23,7 +25,7 @@ def fetch_recent_tweets(query: str):
         url = f"https://api.x.com/2/tweets/search/recent"
         
         # Your bearer token
-        # load_dotenv()
+        load_dotenv()
         bearer_token = os.getenv("BEARER_TOKEN")
         if not bearer_token:
             return {"error": "Authentication Failed"}
@@ -64,15 +66,6 @@ def fetch_recent_tweets(query: str):
         return {"error": "Network connection error"}
     except Exception as e:
         return {"error": f"Unexpected error: {str(e)}"}
-
-def get_sentiment_label(polarity: float) -> str:
-    """Convert sentiment polarity to label"""
-    if polarity > 0.1:
-        return "positive"
-    elif polarity < -0.1:
-        return "negative"
-    else:
-        return "neutral"
 
 def extract_indonesian_city(location_string: str) -> Optional[str]:
     """
@@ -285,11 +278,15 @@ def analyze(query: str):
             text = t.get("text", "")
             author_id = t.get("author_id")
 
-            # Sentiment
-            indobert_sentiment = IndoBERTSentiment()
-            sentiment_blob = TextBlob(text)
-            polarity = sentiment_blob.sentiment.polarity
-            sentiment_label = get_sentiment_label(polarity)
+            # Sentiment (More Acurate But Takes Time)
+            sentiment_result = indobert_sentiment.get_detailed_sentiment(text)
+            polarity = sentiment_result['polarity']
+            sentiment_label = sentiment_result['label']
+
+            # Sentiment (Simpler Version)
+            # sentiment_blob = TextBlob(text)
+            # polarity = sentiment_blob.sentiment.polarity
+            # sentiment_label = indobert_sentiment.get_sentiment_label(polarity)
 
             # Date parsing for trends
             positive_count += polarity > 0
@@ -428,7 +425,7 @@ def analyze(query: str):
                 user_obj = User(
                     username=username,
                     followers=data["followers"],
-                    sentiment=get_sentiment_label(avg_sentiment),
+                    sentiment=indobert_sentiment.get_sentiment_label(avg_sentiment),
                     sentiment_score=round(avg_sentiment, 3),
                     total_tweets=data["tweet_count"]
                 )

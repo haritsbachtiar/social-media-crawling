@@ -1,9 +1,17 @@
 from fastapi import FastAPI, HTTPException, Query
 from analyzer import analyze
 from responses import AnalyzeEndpointResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Social Media Analyzer"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # in dev, allow all
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get('/')
