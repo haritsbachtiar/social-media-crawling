@@ -8,6 +8,7 @@ from textblob import TextBlob
 from dotenv import load_dotenv
 from responses import *
 from typing import Optional
+from indo_bert_sentiment import IndoBERTSentiment
 
 def fetch_recent_tweets(query: str):
     try:
@@ -22,10 +23,13 @@ def fetch_recent_tweets(query: str):
         url = f"https://api.x.com/2/tweets/search/recent"
         
         # Your bearer token
-        load_dotenv()
-        BEARER_TOKEN = os.getenv("BEARER_TOKEN")
+        # load_dotenv()
+        bearer_token = os.getenv("BEARER_TOKEN")
+        if not bearer_token:
+            return {"error": "Authentication Failed"}
+
         headers = {
-            "Authorization": f"Bearer {BEARER_TOKEN}"
+            "Authorization": f"Bearer {bearer_token.strip()}"
         }
         params = {
             "query": encoded_query,
@@ -282,6 +286,7 @@ def analyze(query: str):
             author_id = t.get("author_id")
 
             # Sentiment
+            indobert_sentiment = IndoBERTSentiment()
             sentiment_blob = TextBlob(text)
             polarity = sentiment_blob.sentiment.polarity
             sentiment_label = get_sentiment_label(polarity)
