@@ -14,18 +14,11 @@ from typing import Optional
 
 def fetch_recent_tweets(query: str):
     try:
-        # Encode query to be URL-safe
-        # -- ONLY USING THIS WHEN THE TWITTER PACKAGE UPGRADED --
-        # updated_query = f"{query} place_country:ID"
-        # encoded_query = urllib.parse.quote(updated_query)
-        # -- END OF LINE
-
-        encoded_query = urllib.parse.quote(query)
         max_results = 10
-        url = f"https://api.x.com/2/tweets/search/recent"
+        url = "https://api.x.com/2/tweets/search/recent"
         
         # Your bearer token
-        # load_dotenv()
+        load_dotenv()
         bearer_token = os.getenv("BEARER_TOKEN")
         if not bearer_token:
             return {"error": "Authentication Failed"}
@@ -33,19 +26,32 @@ def fetch_recent_tweets(query: str):
         headers = {
             "Authorization": f"Bearer {bearer_token.strip()}"
         }
+        
+        # FIX: Match exact parameter order and format from curl
         params = {
-            "query": encoded_query,
             "max_results": max_results,
+            "query": query,
             "tweet.fields": "created_at,public_metrics,author_id,geo",
-            "expansions": "author_id,geo.place_id",
+            "expansions": "author_id,geo.place_id", 
             "user.fields": "username,public_metrics,verified,location",
-            "place.fields": "full_name,country,place_type,geo,contained_within"
+            "place.fields": "full_name,country,place_type"
         }
+        
+        # Debug: Print the full URL being called
+        print("🔗 Request URL:", url)
+        print("📋 Request params:", params)
+        print("🔑 Authorization header:", headers.get("Authorization", "")[:50] + "...")
+        
         # Make request with timeout
         response = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        # Debug: Print response details
+        print(f"📊 Response status: {response.status_code}")
+        print(f"🌐 Full URL called: {response.url}")
 
         # Handle HTTP errors
         if response.status_code != 200:
+            print(f"❌ Error response: {response.text}")
             return {
                 "error": f"Failed to fetch tweets (status {response.status_code})",
                 "details": response.text
@@ -53,8 +59,11 @@ def fetch_recent_tweets(query: str):
 
         # Try parsing JSON
         try:
-            return response.json()
-        except ValueError:
+            json_response = response.json()
+            print(f"✅ Successfully got {len(json_response.get('data', []))} tweets")
+            return json_response
+        except ValueError as e:
+            print(f"❌ JSON parsing error: {e}")
             return {
                 "error": "Invalid JSON response",
                 "details": response.text
@@ -237,7 +246,7 @@ def get_sentiment_label(polarity: float) -> str:
 
 def analyze(query: str):
     data = fetch_recent_tweets(query=query)
-
+    print(data)
     if "error" in data:
         return AnalyzeResponse(
             total_mentions=0,
@@ -276,7 +285,6 @@ def analyze(query: str):
     trend = defaultdict(lambda: [0, 0])  # date -> [sent_sum, count]
     engagements = []
     reach_set = set()
-    # location_counter = Counter()
     city_counter = Counter()
     keywords_counter = Counter()
 
@@ -298,8 +306,11 @@ def analyze(query: str):
             polarity = sentiment_blob.sentiment.polarity
             sentiment_label = get_sentiment_label(polarity)
 
+            # Count positive tweets
+            if polarity > 0:
+                positive_count += 1
+
             # Date parsing for trends
-            positive_count += polarity > 0
             created_at = t.get("created_at")
             parsed_datetime = None
             if created_at:
@@ -309,8 +320,9 @@ def analyze(query: str):
                     trend[date][0] += polarity
                     trend[date][1] += 1
                 except ValueError:
-                    # Skip if date parsing fails
-                    continue
+                    date = datetime.now().date().isoformat()
+                    trend[date][0] += polarity
+                    trend[date][1] += 1
 
             # Get author information
             author = users.get(author_id)
@@ -326,20 +338,29 @@ def analyze(query: str):
                 user_sentiments[author_id]["tweet_count"] += 1
                 
                 # Engagement calculation
+                metrics = t.get("public_metrics", {})
+                like_count = metrics.get("like_count", 0)
+                retweet_count = metrics.get("retweet_count", 0)
+                reply_count = metrics.get("reply_count", 0)
+                
+                # Calculate engagement rate (avoid division by zero)
                 if followers > 0:
-                    metrics = t.get("public_metrics", {})
-                    like_count = metrics.get("like_count", 0)
-                    retweet_count = metrics.get("retweet_count", 0)
-                    reply_count = metrics.get("reply_count", 0)
-                    
                     eng = (like_count + retweet_count + reply_count) / followers * 100
-                    engagements.append(eng)
-                    
+                else:
+                    # For users with 0 followers, use raw engagement count
+                    eng = like_count + retweet_count + reply_count
+                engagements.append(eng)
+                
                 reach_set.add(author_id)
 
                 # Profile location as fallback (since geo data is rare)
                 if location and location.strip():
-                    city_name = extract_city_name(location)
+                    # Try Indonesian city extraction first
+                    city_name = extract_indonesian_city(location)
+                    if not city_name:
+                        # Fallback to general city extraction
+                        city_name = extract_city_name(location)
+                    
                     if city_name:
                         city_counter[city_name] += 1
             
@@ -372,7 +393,11 @@ def analyze(query: str):
                         city_counter[city_from_geo] += 1
 
             # Create Tweet object for recent mentions
-            if parsed_datetime and username:
+            if username:
+                if not parsed_datetime:
+                    parsed_datetime = datetime.now()
+
+            # if parsed_datetime and username:
                 tweet_obj = Tweet(
                     platform="twitter",
                     text=text,
@@ -385,15 +410,18 @@ def analyze(query: str):
 
             # Keywords extraction 
             words = []
-            for word in text.split():
+            # Remove mentions and URLs first
+            clean_text = re.sub(r'@\w+|https?://\S+', '', text)
+
+            for word in clean_text.split():
                 # Remove punctuation but keep the word
-                clean_word = word.lower().strip(".,!?:;\"'()[]{}").strip()
-                
-                # Less strict filtering - include more words
-                if (len(clean_word) > 2 and  # Reduced from 3 to 2
-                    not clean_word.startswith(('http', '@')) and  # Allow hashtags
+                clean_word = re.sub(r'[^\w]', '', word.lower()).strip()
+            
+                # More lenient filtering
+                if (len(clean_word) >= 2 and  # Allow 2+ character words
                     not clean_word.isdigit() and  # Exclude pure numbers
-                    clean_word.isalpha()):  # Only alphabetic characters
+                    clean_word.isalpha() and  # Only alphabetic characters
+                    clean_word not in ['rt', 'the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']):  # Exclude common stop words
                     words.append(clean_word)
             
             keywords_counter.update(words)
@@ -427,7 +455,7 @@ def analyze(query: str):
     # Create User objects for top influencers
     top_influencers = []
     for author_id, data in user_sentiments.items():
-        if data["tweet_count"] > 0 and data["followers"] > 100:  # Only users with some influence
+        if data["tweet_count"] > 0:  # Only users with some influence
             avg_sentiment = sum(data["sentiments"]) / len(data["sentiments"])
             author = users.get(author_id)
             if author:
