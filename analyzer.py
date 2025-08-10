@@ -18,7 +18,7 @@ def fetch_recent_tweets(query: str):
         url = "https://api.x.com/2/tweets/search/recent"
         
         # Your bearer token
-        load_dotenv()
+        # load_dotenv()
         bearer_token = os.getenv("BEARER_TOKEN")
         if not bearer_token:
             return {"error": "Authentication Failed"}
